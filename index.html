@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetToolbox · 网络工具站 — 子网计算 / VLAN 规划 / DNS 查询</title>
+  <meta name="description" content="纯前端实现的网络工具集：IPv4 子网计算器、VLSM 变长划分、校园网 VLAN 规划、DNS over HTTPS 在线解析查询、IP 进制换算。零后端、零依赖。">
+  <meta name="keywords" content="子网计算器,子网掩码,VLSM,VLAN规划,DNS查询,CIDR,IPv4,网络工程">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧮</text></svg>">
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+
+  <header class="topbar">
+    <div class="wrap topbar-inner">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">N</span>
+        <div class="brand-text">
+          <span class="brand-name">NetToolbox</span>
+          <span class="brand-sub">网络工具站 · 纯前端零后端</span>
+        </div>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="工具切换">
+        <button class="tab is-active" role="tab" aria-selected="true" aria-controls="panel-subnet" data-panel="subnet">子网计算</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-divide" data-panel="divide">子网划分</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-vlan" data-panel="vlan">VLAN 规划</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-dns" data-panel="dns">DNS 查询</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-convert" data-panel="convert">IP 换算</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">
+
+    <!-- ============ 子网计算器 ============ -->
+    <section id="panel-subnet" class="panel is-active" role="tabpanel" aria-labelledby="tab-subnet">
+      <div class="panel-head">
+        <h2>IPv4 子网计算器</h2>
+        <p>输入任意 IP 与掩码，得到网络地址、广播地址、可用主机范围等完整信息。支持 <code>192.168.1.10/24</code> 或 <code>192.168.1.0/255.255.255.0</code> 两种写法。</p>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="field grow">
+            <label for="subnet-input">IP 地址 / CIDR</label>
+            <input id="subnet-input" type="text" placeholder="例如 192.168.21.10/24" value="192.168.21.10/24" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="subnet-prefix">或直接选前缀</label>
+            <select id="subnet-prefix"></select>
+          </div>
+          <button id="subnet-calc" class="btn btn-primary" type="button">开始计算</button>
+        </div>
+
+        <div class="chips" id="subnet-samples">
+          <span class="chips-label">常用示例：</span>
+          <button class="chip" type="button" data-value="192.168.21.10/24">192.168.21.10/24</button>
+          <button class="chip" type="button" data-value="192.168.200.1/24">192.168.200.1/24</button>
+          <button class="chip" type="button" data-value="10.0.0.0/8">10.0.0.0/8</button>
+          <button class="chip" type="button" data-value="172.16.5.5/20">172.16.5.5/20</button>
+          <button class="chip" type="button" data-value="203.0.113.0/26">203.0.113.0/26</button>
+        </div>
+
+        <div id="subnet-error" class="alert alert-error" hidden></div>
+        <div id="subnet-result" hidden></div>
+      </div>
+    </section>
+
+    <!-- ============ 子网划分 ============ -->
+    <section id="panel-divide" class="panel" role="tabpanel" aria-labelledby="tab-divide" hidden>
+      <div class="panel-head">
+        <h2>子网划分</h2>
+        <p>两种划分方式：按数量等分，或按各部门实际主机数做 VLSM 变长划分（可减少地址浪费）。</p>
+      </div>
+
+      <div class="card">
+        <div class="segmented" role="tablist" aria-label="划分方式">
+          <button class="seg is-active" type="button" data-mode="equal" role="tab" aria-selected="true">等分为 N 个子网</button>
+          <button class="seg" type="button" data-mode="vlsm" role="tab" aria-selected="false">VLSM · 按需求划分</button>
+        </div>
+
+        <!-- 等分模式 -->
+        <div id="divide-equal" class="mode-body">
+          <div class="row">
+            <div class="field grow">
+              <label for="eq-base">基础网段</label>
+              <input id="eq-base" type="text" value="192.168.21.0/24" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="field">
+              <label for="eq-count">划分成</label>
+              <input id="eq-count" type="number" min="1" max="1024" value="4">
+            </div>
+            <button id="eq-run" class="btn btn-primary" type="button">划分</button>
+          </div>
+        </div>
+
+        <!-- VLSM 模式 -->
+        <div id="divide-vlsm" class="mode-body" hidden>
+          <div class="row">
+            <div class="field grow">
+              <label for="vlsm-base">基础网段</label>
+              <input id="vlsm-base" type="text" value="192.168.0.0/22" spellcheck="false" autocomplete="off">
+            </div>
+            <button id="vlsm-run" class="btn btn-primary" type="button">分配</button>
+          </div>
+          <div class="field">
+            <label for="vlsm-demands">各部门所需主机数（每行一条：<code>名称 空格 主机数</code>）</label>
+            <textarea id="vlsm-demands" rows="5" spellcheck="false">研发部 100
+市场部 50
+财务部 20
+行政部 6</textarea>
+          </div>
+        </div>
+
+        <div id="divide-error" class="alert alert-error" hidden></div>
+        <div id="divide-result" hidden></div>
+      </div>
+    </section>
+
+    <!-- ============ VLAN 规划 ============ -->
+    <section id="panel-vlan" class="panel" role="tabpanel" aria-labelledby="tab-vlan" hidden>
+      <div class="panel-head">
+        <h2>校园网 VLAN 规划器</h2>
+        <p>输入每种 VLAN 需要容纳的主机数，自动算出整套方案：VLAN ID、网段、掩码、网关、DHCP 地址池，并可导出 Markdown 表格与 Cisco 配置片段。</p>
+      </div>
+
+      <div class="card">
+        <div class="segmented" role="tablist" aria-label="分配模式">
+          <button class="seg is-active" type="button" data-mode="sequential" role="tab" aria-selected="true">顺序分配（自动切分子网）</button>
+          <button class="seg" type="button" data-mode="vlanAsOctet" role="tab" aria-selected="false">VLAN 号作第三段</button>
+        </div>
+
+        <!-- 顺序分配 -->
+        <div id="vlan-sequential" class="mode-body">
+          <div class="row wrap-row">
+            <div class="field grow">
+              <label for="vlan-base">基础网段</label>
+              <input id="vlan-base" type="text" value="192.168.0.0/16" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="field sm">
+              <label for="vlan-start">起始 VLAN ID</label>
+              <input id="vlan-start" type="number" min="1" max="4094" value="21">
+            </div>
+            <div class="field sm">
+              <label for="vlan-groups">VLAN 组数</label>
+              <input id="vlan-groups" type="number" min="1" max="200" value="6">
+            </div>
+            <div class="field sm">
+              <label for="vlan-hosts">每组主机数</label>
+              <input id="vlan-hosts" type="number" min="1" value="60">
+            </div>
+            <div class="field sm">
+              <label for="vlan-prefix">名称前缀</label>
+              <input id="vlan-prefix" type="text" value="VLAN" spellcheck="false" autocomplete="off">
+            </div>
+          </div>
+        </div>
+
+        <!-- VLAN 号作第三段 -->
+        <div id="vlan-asoctet" class="mode-body" hidden>
+          <div class="row wrap-row">
+            <div class="field">
+              <label for="octet-head">前两段</label>
+              <input id="octet-head" type="text" value="192.168" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="field sm">
+              <label for="octet-start">起始 VLAN ID</label>
+              <input id="octet-start" type="number" min="1" max="255" value="21">
+            </div>
+            <div class="field sm">
+              <label for="octet-groups">VLAN 组数</label>
+              <input id="octet-groups" type="number" min="1" max="200" value="6">
+            </div>
+            <div class="field sm">
+              <label for="octet-hostbits">主机位数</label>
+              <select id="octet-hostbits">
+                <option value="8" selected>8（/24 · 254 台）</option>
+                <option value="7">7（/25 · 126 台）</option>
+                <option value="6">6（/26 · 62 台）</option>
+                <option value="5">5（/27 · 30 台）</option>
+                <option value="10">10（/22 · 1022 台）</option>
+              </select>
+            </div>
+          </div>
+          <p class="inline-hint">该模式下 VLAN 21 会自动对应 <code>192.168.21.0/24</code>，设备与网段一一对应，便于排障。</p>
+        </div>
+
+        <div class="row vlan-extra">
+          <label class="checkbox">
+            <input id="vlan-add-server" type="checkbox">
+            <span>附带服务器区 VLAN</span>
+          </label>
+          <div class="field sm">
+            <label for="server-vlan">VLAN ID</label>
+            <input id="server-vlan" type="number" min="1" max="4094" value="200">
+          </div>
+          <div class="field">
+            <label for="server-cidr">服务器区网段</label>
+            <input id="server-cidr" type="text" value="192.168.200.0/24" spellcheck="false" autocomplete="off">
+          </div>
+          <button id="vlan-run" class="btn btn-primary" type="button">生成方案</button>
+        </div>
+
+        <div id="vlan-error" class="alert alert-error" hidden></div>
+        <div id="vlan-result" hidden></div>
+      </div>
+    </section>
+
+    <!-- ============ DNS 查询 ============ -->
+    <section id="panel-dns" class="panel" role="tabpanel" aria-labelledby="tab-dns" hidden>
+      <div class="panel-head">
+        <h2>DNS 在线查询</h2>
+        <p>本站没有自己的后端服务器，查询通过公共的 <strong>DNS over HTTPS</strong> 接口完成 —— 把 DNS 查询封装成 HTTPS 请求，从而绕开浏览器无法发送 UDP 53 的限制。</p>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="field grow">
+            <label for="dns-domain">域名</label>
+            <input id="dns-domain" type="text" placeholder="例如 example.com" spellcheck="false" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="dns-type">记录类型</label>
+            <select id="dns-type"></select>
+          </div>
+          <button id="dns-run" class="btn btn-primary" type="button">查询</button>
+        </div>
+
+        <div class="chips" id="dns-samples">
+          <span class="chips-label">试试：</span>
+          <button class="chip" type="button" data-domain="github.com" data-type="A">github.com A</button>
+          <button class="chip" type="button" data-domain="github.com" data-type="CNAME">github.com CNAME</button>
+          <button class="chip" type="button" data-domain="qq.com" data-type="MX">qq.com MX</button>
+          <button class="chip" type="button" data-domain="cloudflare.com" data-type="AAAA">cloudflare.com AAAA</button>
+          <button class="chip" type="button" data-domain="baidu.com" data-type="NS">baidu.com NS</button>
+          <button class="chip" type="button" data-domain="example.com" data-type="TXT">example.com TXT</button>
+        </div>
+
+        <p class="inline-hint" id="dns-type-help"></p>
+
+        <div id="dns-error" class="alert alert-error" hidden></div>
+        <div id="dns-loading" class="alert alert-info" hidden>正在查询，请稍候…</div>
+        <div id="dns-result" hidden></div>
+      </div>
+
+      <div class="card card-note">
+        <h3>这套查询背后的链路</h3>
+        <ol class="steps">
+          <li>浏览器向你输入的域名发 HTTPS 请求，先要把它解析成 IP</li>
+          <li>本机 → 本地 DNS 缓存 → 路由器 → 运营商 DNS，逐级询问</li>
+          <li>若都没有，则向<strong>根域名服务器</strong>发起迭代查询，逐级下沉到顶级域（.com）与权威 DNS</li>
+          <li>权威服务器返回记录，各级缓存并按 TTL 保存</li>
+        </ol>
+        <p class="muted">上表里的 <code>TTL</code> 就是这条记录还能被缓存多久（单位：秒）。</p>
+      </div>
+    </section>
+
+    <!-- ============ IP 换算 ============ -->
+    <section id="panel-convert" class="panel" role="tabpanel" aria-labelledby="tab-convert" hidden>
+      <div class="panel-head">
+        <h2>IP 进制换算</h2>
+        <p>点分十进制、32 位整数、二进制、十六进制之间的相互转换。</p>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="field grow">
+            <label for="cv-ip">点分十进制 IP</label>
+            <input id="cv-ip" type="text" placeholder="例如 192.168.1.1" value="192.168.1.1" spellcheck="false" autocomplete="off">
+          </div>
+          <button id="cv-run" class="btn btn-primary" type="button">换算</button>
+        </div>
+        <div id="cv-error" class="alert alert-error" hidden></div>
+        <div id="cv-result"></div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <div class="field grow">
+            <label for="cv-int">反过来：32 位无符号整数 → IP</label>
+            <input id="cv-int" type="text" placeholder="例如 3232235777" value="3232235777" spellcheck="false" autocomplete="off">
+          </div>
+          <button id="cv-run2" class="btn btn-primary" type="button">换算</button>
+        </div>
+        <div id="cv2-error" class="alert alert-error" hidden></div>
+        <div id="cv2-result"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-inner">
+      <p>NetToolbox · 纯 HTML / CSS / JavaScript 手写，无框架无构建无依赖</p>
+      <p><span id="year"></span> · 子网算法已通过 98 项单元测试</p>
+    </div>
+  </footer>
+
+  <script src="js/subnet.js"></script>
+  <script src="js/vlan.js"></script>
+  <script src="js/dns.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
